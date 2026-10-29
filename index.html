@@ -198,7 +198,69 @@
 
   <script>
     let allVerbs = [];
-    const cache = {}; // Keeps max 2-3 chunk files in RAM to avoid iPhone memory pressure
+    const cache = {}; // Keeps loaded letter chunks
+
+    // Common irregular forms mapping -> infinitive
+    const IRREGULAR_FORMS = {
+      // zijn
+      'ben': 'zijn', 'bent': 'zijn', 'is': 'zijn', 'was': 'zijn', 'waren': 'zijn', 'geweest': 'zijn', 'wees': 'zijn',
+      // hebben
+      'heb': 'hebben', 'hebt': 'hebben', 'heeft': 'hebben', 'had': 'hebben', 'hadden': 'hebben', 'gehad': 'hebben',
+      // worden
+      'word': 'worden', 'wordt': 'worden', 'werd': 'worden', 'werden': 'worden', 'geworden': 'worden',
+      // gaan
+      'ga': 'gaan', 'gaat': 'gaan', 'ging': 'gaan', 'gingen': 'gaan', 'gegaan': 'gaan',
+      // komen
+      'kom': 'komen', 'komt': 'komen', 'kwam': 'komen', 'kwamen': 'komen', 'gekomen': 'komen',
+      // doen
+      'doe': 'doen', 'doet': 'doen', 'deed': 'doen', 'deden': 'doen', 'gedaan': 'doen',
+      // kunnen
+      'kan': 'kunnen', 'kunt': 'kunnen', 'kon': 'kunnen', 'konden': 'kunnen', 'gekund': 'kunnen',
+      // moeten
+      'moet': 'moeten', 'moest': 'moeten', 'moesten': 'moeten', 'gemoeten': 'moeten',
+      // mogen
+      'mag': 'mogen', 'mocht': 'mogen', 'mochten': 'mogen', 'gemogen': 'mogen',
+      // willen
+      'wil': 'willen', 'wilt': 'willen', 'wou': 'willen', 'wilde': 'willen', 'wilden': 'willen', 'gewild': 'willen',
+      // zullen
+      'zal': 'zullen', 'zult': 'zullen', 'zou': 'zullen', 'zouden': 'zullen',
+      // weten
+      'weet': 'weten', 'wist': 'weten', 'wisten': 'weten', 'geweten': 'weten',
+      // zien
+      'zie': 'zien', 'ziet': 'zien', 'zag': 'zien', 'zagen': 'zien', 'gezien': 'zien',
+      // geven
+      'geef': 'geven', 'geeft': 'geven', 'gaf': 'geven', 'gaven': 'geven', 'gegeven': 'geven',
+      // staan
+      'sta': 'staan', 'staat': 'staan', 'stond': 'staan', 'stonden': 'staan', 'gestaan': 'staan',
+      // nemen
+      'neem': 'nemen', 'neemt': 'nemen', 'nam': 'nemen', 'namen': 'nemen', 'genomen': 'nemen',
+      // zeggen
+      'zeg': 'zeggen', 'zegt': 'zeggen', 'zei': 'zeggen', 'zeiden': 'zeggen', 'gezegd': 'zeggen',
+      // denken
+      'denk': 'denken', 'denkt': 'denken', 'dacht': 'denken', 'dachten': 'denken', 'gedacht': 'denken',
+      // brengen
+      'breng': 'brengen', 'brengt': 'brengen', 'bracht': 'brengen', 'brachten': 'brengen', 'gebracht': 'brengen',
+      // kijken
+      'kijk': 'kijken', 'kijkt': 'kijken', 'keek': 'kijken', 'keken': 'kijken', 'gekeken': 'kijken',
+      // lopen
+      'loop': 'lopen', 'loopt': 'lopen', 'liep': 'lopen', 'liepen': 'lopen', 'gelopen': 'lopen',
+      // eten
+      'eet': 'eten', 'at': 'eten', 'aten': 'eten', 'gegeten': 'eten',
+      // drinken
+      'drink': 'drinkt', 'dronk': 'drinken', 'dronken': 'drinken', 'gedronken': 'drinken',
+      // vinden
+      'vind': 'vinden', 'vindt': 'vinden', 'vond': 'vinden', 'vonden': 'vinden', 'gevonden': 'vinden',
+      // schrijven
+      'schrijf': 'schrijven', 'schrijft': 'schrijven', 'schreef': 'schrijven', 'schreven': 'schrijven', 'geschreven': 'schrijven',
+      // lezen
+      'lees': 'lezen', 'leest': 'lezen', 'las': 'lezen', 'lazen': 'lezen', 'gelezen': 'lezen',
+      // slapen
+      'slaap': 'slapen', 'slaapt': 'slapen', 'sliep': 'slapen', 'sliepen': 'slapen', 'geslapen': 'slapen',
+      // spreken
+      'spreek': 'spreken', 'spreekt': 'spreken', 'sprak': 'spreken', 'spraken': 'spreken', 'gesproken': 'spreken',
+      // blijven
+      'blijf': 'blijven', 'blijft': 'blijven', 'bleef': 'blijven', 'bleven': 'blijven', 'gebleven': 'blijven'
+    };
 
     async function init() {
       try {
@@ -234,10 +296,48 @@
         renderList(allVerbs.slice(0, 100));
         return;
       }
-      const matches = allVerbs.filter(v => v.startsWith(query) || v.includes(query)).slice(0, 100);
-      renderList(matches);
-      if (matches.length > 0 && matches[0] === query) {
-        loadVerb(query);
+
+      const results = [];
+      const seen = new Set();
+
+      // 1. Check if the query is a conjugated form (e.g., 'ben' -> 'zijn', 'had' -> 'hebben', 'kwam' -> 'komen')
+      if (IRREGULAR_FORMS[query]) {
+        const inf = IRREGULAR_FORMS[query];
+        results.push(inf);
+        seen.add(inf);
+      }
+
+      // 2. Exact match on infinitive
+      if (allVerbs.includes(query) && !seen.has(query)) {
+        results.push(query);
+        seen.add(query);
+      }
+
+      // 3. Verbs that start with the query
+      for (const v of allVerbs) {
+        if (v.startsWith(query) && !seen.has(v)) {
+          results.push(v);
+          seen.add(v);
+          if (results.length >= 100) break;
+        }
+      }
+
+      // 4. Verbs that contain the query
+      if (results.length < 100) {
+        for (const v of allVerbs) {
+          if (v.includes(query) && !seen.has(v)) {
+            results.push(v);
+            seen.add(v);
+            if (results.length >= 100) break;
+          }
+        }
+      }
+
+      renderList(results);
+
+      // Auto-load best match
+      if (results.length > 0 && (results[0] === query || IRREGULAR_FORMS[query] === results[0])) {
+        loadVerb(results[0]);
       }
     });
 
