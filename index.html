@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Werkwoorden">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Nederlandse Werkwoorden (Offline)</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --border: #e2e8f0;
+      --tense-bg: #f1f5f9;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --accent: #3b82f6;
+        --border: #334155;
+        --tense-bg: #1e293b;
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      padding: 12px 16px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .search-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 17px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 280px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+    }
+    .verb-item {
+      padding: 12px 16px;
+      font-size: 15px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .verb-item:hover, .verb-item.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .verb-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-top: 0;
+      margin-bottom: 16px;
+      text-transform: capitalize;
+    }
+    .principal-card {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(37, 99, 235, 0.02) 100%);
+      border: 1.5px solid var(--accent);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .principal-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .principal-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--accent);
+    }
+    .principal-value {
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .tense-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .tense-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .conj-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 15px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .conj-row:last-child { border-bottom: none; }
+    .person { color: var(--muted); }
+    .form { font-weight: 500; }
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    @media (max-width: 640px) {
+      .layout { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        max-height: 180px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .content { padding: 14px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Zoek werkwoord... (bijv. hebben, zijn, lopen)" autocomplete="off" autocorrect="off" autocapitalize="none">
+    </div>
+  </header>
+  <div class="layout">
+    <div class="sidebar" id="verbList"></div>
+    <div class="content" id="mainContent">
+      <div class="placeholder">Typ hierboven een werkwoord om de vervoeging te bekijken.</div>
+    </div>
+  </div>
+
+  <script>
+    let allVerbs = [];
+    const cache = {}; // Keeps max 2-3 chunk files in RAM to avoid iPhone memory pressure
+
+    async function init() {
+      try {
+        const res = await fetch('verbs_index.json');
+        allVerbs = await res.json();
+        renderList(allVerbs.slice(0, 100));
+        
+        // Check hash or load first
+        if (window.location.hash) {
+          const v = decodeURIComponent(window.location.hash.substring(1));
+          loadVerb(v);
+        }
+      } catch (e) {
+        console.error("Kon index niet laden:", e);
+      }
+    }
+
+    function renderList(verbs) {
+      const listEl = document.getElementById('verbList');
+      listEl.innerHTML = '';
+      verbs.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'verb-item';
+        div.textContent = v;
+        div.onclick = () => loadVerb(v);
+        listEl.appendChild(div);
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      if (!query) {
+        renderList(allVerbs.slice(0, 100));
+        return;
+      }
+      const matches = allVerbs.filter(v => v.startsWith(query) || v.includes(query)).slice(0, 100);
+      renderList(matches);
+      if (matches.length > 0 && matches[0] === query) {
+        loadVerb(query);
+      }
+    });
+
+    async function loadVerb(verb) {
+      window.location.hash = verb;
+      const initial = verb.charAt(0).toLowerCase();
+      
+      // Update active state in sidebar
+      document.querySelectorAll('.verb-item').forEach(el => {
+        el.classList.toggle('active', el.textContent === verb);
+      });
+
+      // Lazy load chunk if not cached
+      if (!cache[initial]) {
+        try {
+          const res = await fetch(`data/${initial}.json`);
+          cache[initial] = await res.json();
+        } catch (err) {
+          console.error("Fout bij laden van letter chunk:", err);
+          return;
+        }
+      }
+
+      const verbData = cache[initial][verb];
+      const contentEl = document.getElementById('mainContent');
+      
+      if (!verbData || Object.keys(verbData).length === 0) {
+        contentEl.innerHTML = `<h2 class="verb-title">${verb}</h2><p>Geen vervoegingen gevonden.</p>`;
+        return;
+      }
+
+      let html = `<h1 class="verb-title">${verb}</h1>`;
+
+      // Principal parts extraction directly from existing verbData (no JSON change)
+      const ovtRows = verbData['onvoltooid verleden tijd (ovt)'] || [];
+      const vdRows = verbData['voltooid deelwoord'] || [];
+
+      // OVT single (ik) & plural (wij)
+      const ovtSingular = (ovtRows.find(r => r.p.startsWith('ik')) || ovtRows[0] || {}).f || '-';
+      const ovtPlural = (ovtRows.find(r => r.p.startsWith('wij')) || ovtRows[ovtRows.length - 1] || {}).f || '';
+      const ovtDisplay = ovtPlural && ovtPlural !== ovtSingular ? `${ovtSingular} / ${ovtPlural}` : ovtSingular;
+
+      // Voltooid deelwoord
+      const vdDisplay = (vdRows[0] || {}).f || '-';
+
+      html += `
+      <div class="principal-card">
+        <div class="principal-item">
+          <span class="principal-label">Infinitief</span>
+          <span class="principal-value">${verb}</span>
+        </div>
+        <div class="principal-item">
+          <span class="principal-label">Onvoltooid Verleden Tijd (OVT)</span>
+          <span class="principal-value">${ovtDisplay}</span>
+        </div>
+        <div class="principal-item">
+          <span class="principal-label">Voltooid Deelwoord (VD)</span>
+          <span class="principal-value">${vdDisplay}</span>
+        </div>
+      </div>
+      `;
+
+      html += `<div class="grid">`;
+      for (const [tense, rows] of Object.entries(verbData)) {
+        html += `<div class="tense-card"><div class="tense-title">${tense}</div>`;
+        rows.forEach(r => {
+          html += `<div class="conj-row"><span class="person">${r.p || ''}</span><span class="form">${r.f || ''}</span></div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+      contentEl.innerHTML = html;
+      contentEl.scrollTop = 0;
+    }
+
+    init();
+
+    // Register Service Worker for 100% Offline PWA functionality
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
